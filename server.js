@@ -1,7 +1,7 @@
 import express from 'express'
 import bodyParser from 'body-parser'
 import cors from 'cors'
-import mongoose from 'mongoose'
+import mongoose, { Schema } from 'mongoose'
 
 import clinicData from './data/clinic-data.json'
 
@@ -19,7 +19,11 @@ const Clinic = new mongoose.model('Clinic', {
   text_reviews_count: { 
     type: Number,
     default: 0
-  }
+  },
+  reviews: [{ // not sure if this is needed? 
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Review'
+  }]
 })
 
 const Review = mongoose.model('Review', {
@@ -43,7 +47,7 @@ const Review = mongoose.model('Review', {
     type: Date,
     default: Date.now
   },
-  clinic: {
+  clinic_id: {
     type: mongoose.Schema.Types.ObjectId, 
     ref: "Clinic"
   }
@@ -75,7 +79,16 @@ app.get('/', (req, res) => {
   res.send('This is my final project API')
 })
 
-// GET requests to display clinic data
+// GET requests to display clinic data - Not working correctly - should only be able to query on region and address
+app.get('/clinics', async (req, res) => {
+  try {
+    const clinics = await Clinic.find(req.query)
+    res.json(clinics)
+  } catch (err) {
+    res.status(404).json({ message: 'Could not find any clinics', error: err.errors })
+  }
+})
+
 // by region/location
 // by clinic type
 // filter/sort?
@@ -85,12 +98,12 @@ app.get('/', (req, res) => {
 // POST request to delete clinic data
 // POST request to modify clinic data
 
-// POST request to perform reviews on certain clinics
+// POST request reviews for a certain clinic
 app.post('/clinics/:id/review', async (req, res) => { // watch Van week 19, 53.00
   try {
     const { id } = req.params
-    const { review, rating, name } = req.body
-    const savedReview = await new Review({ review, rating, name }).save()
+    const { review, rating, name, clinic_id } = req.body
+    const savedReview = await new Review({ review, rating, name, clinic_id }).save()
     await Clinic.updateOne({ _id: id }, { $inc : {'text_reviews_count': 1} })
     res.status(201).json(savedReview)
   } catch (err) {
@@ -98,7 +111,18 @@ app.post('/clinics/:id/review', async (req, res) => { // watch Van week 19, 53.0
   }
 })
 
-// GET requests to display reviews  
+// GET request to display all reviews - PAGINATION MISSING
+app.get('/clinics/reviews', async (req, res) => {
+  const reviews = await Review.find().sort({ review_date: 'desc' }).exec()
+  res.json(reviews)
+})
+
+// GET requests to display reviews by ID 
+app.get('/clinics/:id/reviews', async (req, res) => {
+  const { id } = req.params
+  const reviews = await Review.find({ clinic_id: id })
+  res.json(reviews)
+})
 
 // Start the server
 app.listen(port, () => {
