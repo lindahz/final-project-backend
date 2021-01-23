@@ -1,7 +1,7 @@
 import express from 'express'
 import bodyParser from 'body-parser'
 import cors from 'cors'
-import mongoose, { Schema } from 'mongoose'
+import mongoose from 'mongoose'
 
 import clinicData from './data/clinic-data.json'
 
@@ -20,7 +20,7 @@ const Clinic = new mongoose.model('Clinic', {
     type: Number,
     default: 0
   },
-  reviews: [{ // not sure if this is needed? 
+  reviews: [{ // not sure if this is written correctly to add the review object after every review, use populate()?
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Review'
   }]
@@ -49,7 +49,8 @@ const Review = mongoose.model('Review', {
   },
   clinic_id: {
     type: mongoose.Schema.Types.ObjectId, 
-    ref: "Clinic"
+    ref: "Clinic",
+    required: true
   }
 })
 
@@ -79,32 +80,68 @@ app.get('/', (req, res) => {
   res.send('This is my final project API')
 })
 
-// GET requests to display clinic data - Not working correctly - should only be able to query on region and address
+// GET requests to display clinic data - Add possibility to query on region & address + Add pagination
 app.get('/clinics', async (req, res) => {
   try {
-    const clinics = await Clinic.find(req.query)
-    res.json(clinics)
-  } catch (err) {
-    res.status(404).json({ message: 'Could not find any clinics', error: err.errors })
-  }
-})
+    const { search } = req.query
+    const sortField = req.query.sortField
+    const sortOrder = req.query.sortOrder || 'asc'
 
-// by region/location
-// by clinic type
-// filter/sort?
-// pagination
+    console.log(`GET/clinics?search=${search}&sortField=${sortField}&sortOrder=${sortOrder}`) // How the URL will look like 
 
+    const queryRegex = new RegExp(search, 'i')
+
+    let databaseQuery = Clinic.find({ region: queryRegex }).populate('reviews') // how can I add address aswell? + return a message instead of empty array.
+
+    if (sortField) {
+      databaseQuery = databaseQuery.sort({ 
+        [sortField]: sortOrder === 'asc' ? 1 : -1
+      })
+    }
+    const results = await databaseQuery 
+    res.status(200).json(results)
+
+    } catch (err) {
+      res.status(404).json({ message: 'Could not find clinics', error: err.errors })
+    }
+  })
+
+// TO DO:s
+// sort and order any parameter - DONE
+// pagination - FRIDAY
+// filter/search by region + address - FRIDAY
+// correct error messages - FRIDAY
+// fix joining collection
+
+// Frontend or backend?
+// filter by emergency or not
+// filter by clinic type
+// filter by open days
+
+// Stretch goals:
 // POST requests to add clinic data
 // POST request to delete clinic data
 // POST request to modify clinic data
 
-// POST request reviews for a certain clinic
-app.post('/clinics/:id/review', async (req, res) => { // watch Van week 19, 53.00
+
+// GET request to display a clinic by ID
+app.get('/clinic/:id', async (req, res) => {
+  try {
+    const { id } = req.params
+    const clinic = await Clinic.findById(id)
+    res.json(clinic)
+  } catch (err) {
+    res.status(404).json({ message: 'Could not find clinic with matching id', error: err.errors })
+  }
+})
+
+// POST request reviews for a certain clinic - how to add this data to Clinic collection as an object?
+app.post('/clinics/:id/review', async (req, res) => {
   try {
     const { id } = req.params
     const { review, rating, name, clinic_id } = req.body
     const savedReview = await new Review({ review, rating, name, clinic_id }).save()
-    await Clinic.updateOne({ _id: id }, { $inc : {'text_reviews_count': 1} })
+    await Clinic.updateOne({ _id: id }, { $inc : { text_reviews_count: 1 }, $push : { reviews: savedReview} }) // why is push not working correctly?
     res.status(201).json(savedReview)
   } catch (err) {
     res.status(404).json({ message: 'Could not create review', error: err.errors })
@@ -117,7 +154,7 @@ app.get('/clinics/reviews', async (req, res) => {
   res.json(reviews)
 })
 
-// GET requests to display reviews by ID 
+// GET requests to display reviews by clinic ID 
 app.get('/clinics/:id/reviews', async (req, res) => {
   const { id } = req.params
   const reviews = await Review.find({ clinic_id: id })
