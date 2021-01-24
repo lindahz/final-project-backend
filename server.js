@@ -20,7 +20,7 @@ const Clinic = new mongoose.model('Clinic', {
     type: Number,
     default: 0
   },
-  reviews: [{ // not sure if this is written correctly to add the review object after every review, use populate()?
+  reviews: [{ 
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Review'
   }]
@@ -80,25 +80,43 @@ app.get('/', (req, res) => {
   res.send('This is my final project API')
 })
 
-// GET requests to display clinic data - Add possibility to query on region & address + Add pagination
+// TO DO:s
+
+// sort and order any parameter - DONE
+// fix joining collection - DONE
+// pagination - SUNDAY
+// filter/search by region + address - SUNDAY
+// correct error messages - SUNDAY
+
+// Frontend or backend?
+// filter by emergency or not
+// filter by clinic type
+// filter by open days
+
+// GET requests to display clinic data 
 app.get('/clinics', async (req, res) => {
   try {
     const { search } = req.query
     const sortField = req.query.sortField
     const sortOrder = req.query.sortOrder || 'asc'
+    const queryRegex = new RegExp(search, 'i') // add regex for empty spaces
+    const pageSize = req.query.pageSize
+    const pageNum = req.query.pageNum
+    const skips = pageSize * (pageNum - 1)
 
-    console.log(`GET/clinics?search=${search}&sortField=${sortField}&sortOrder=${sortOrder}`) // How the URL will look like 
+    // how can I add address as well? + return a message instead of empty array.
+    // how can I get the total results i.e clinics.length whiles doing pagination?
 
-    const queryRegex = new RegExp(search, 'i')
+    console.log(`GET/clinics?search=${search}&sortField=${sortField}&sortOrder=${sortOrder}&pageSize=${pageSize}&pageNum=${pageNum}`) // How the URL will look like 
 
-    let databaseQuery = Clinic.find({ region: queryRegex }).populate('reviews') // how can I add address aswell? + return a message instead of empty array.
-
+    let databaseQuery = Clinic.find({ region: queryRegex }).populate('reviews')
+  
     if (sortField) {
       databaseQuery = databaseQuery.sort({ 
         [sortField]: sortOrder === 'asc' ? 1 : -1
       })
     }
-    const results = await databaseQuery 
+    const results = await databaseQuery.skip(skips).limit(+pageSize)
     res.status(200).json(results)
 
     } catch (err) {
@@ -106,58 +124,50 @@ app.get('/clinics', async (req, res) => {
     }
   })
 
-// TO DO:s
-// sort and order any parameter - DONE
-// pagination - FRIDAY
-// filter/search by region + address - FRIDAY
-// correct error messages - FRIDAY
-// fix joining collection
-
-// Frontend or backend?
-// filter by emergency or not
-// filter by clinic type
-// filter by open days
-
-// Stretch goals:
-// POST requests to add clinic data
-// POST request to delete clinic data
-// POST request to modify clinic data
-
-
 // GET request to display a clinic by ID
 app.get('/clinic/:id', async (req, res) => {
   try {
     const { id } = req.params
-    const clinic = await Clinic.findById(id)
+    const clinic = await Clinic.findById(id).populate('reviews')
     res.json(clinic)
   } catch (err) {
     res.status(404).json({ message: 'Could not find clinic with matching id', error: err.errors })
   }
 })
 
-// POST request reviews for a certain clinic - how to add this data to Clinic collection as an object?
+// POST request reviews for a certain clinic
 app.post('/clinics/:id/review', async (req, res) => {
   try {
     const { id } = req.params
     const { review, rating, name, clinic_id } = req.body
     const savedReview = await new Review({ review, rating, name, clinic_id }).save()
-    await Clinic.updateOne({ _id: id }, { $inc : { text_reviews_count: 1 }, $push : { reviews: savedReview} }) // why is push not working correctly?
+    await Clinic.updateOne({ _id: id }, { $inc : { text_reviews_count: 1 }, $push : { reviews: savedReview} })
     res.status(201).json(savedReview)
   } catch (err) {
     res.status(404).json({ message: 'Could not create review', error: err.errors })
   }
 })
 
-// GET request to display all reviews - PAGINATION MISSING
+// GET request to display all reviews
 app.get('/clinics/reviews', async (req, res) => {
-  const reviews = await Review.find().sort({ review_date: 'desc' }).exec()
+  const pageSize = req.query.pageSize
+  const pageNum = req.query.pageNum
+  const skips = pageSize * (pageNum - 1)
+
+  console.log(`GET/clinics/reviews?pageSize=${pageSize}&pageNum=${pageNum}`) // How the URL will look like 
+
+  const reviews = await Review.find().sort({ review_date: 'desc' }).skip(skips).limit(+pageSize)
   res.json(reviews)
 })
 
 // GET requests to display reviews by clinic ID 
-app.get('/clinics/:id/reviews', async (req, res) => {
+app.get('/clinic/:id/reviews', async (req, res) => {
   const { id } = req.params
-  const reviews = await Review.find({ clinic_id: id })
+  const pageSize = req.query.pageSize
+  const pageNum = req.query.pageNum
+  const skips = pageSize * (pageNum - 1)
+
+  const reviews = await Review.find({ clinic_id: id }).skip(skips).limit(+pageSize)
   res.json(reviews)
 })
 
