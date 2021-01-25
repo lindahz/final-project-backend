@@ -109,16 +109,17 @@ app.get('/clinics', async (req, res) => {
     console.log(`GET/clinics?search=${search}&sortField=${sortField}&sortOrder=${sortOrder}&pageSize=${pageSize}&pageNum=${pageNum}`) // How the URL will look like 
 
     let databaseQuery = Clinic.find({ $or:[ { region: queryRegex }, { address: queryRegex } ] }).populate('reviews')
-  
-    // count documents for pagination 
 
     if (sortField) {
       databaseQuery = databaseQuery.sort({ 
         [sortField]: sortOrder === 'asc' ? 1 : -1
       })
     }
+
     const results = await databaseQuery.skip(skips).limit(+pageSize)
-    res.status(200).json(results)
+    const docCount = await Clinic.countDocuments().exec()
+    
+    res.status(200).json([{ clinics: results }, { total_results: docCount }])
 
     } catch (err) {
       res.status(400).json({ message: 'Could not find clinics', error: err.errors })
