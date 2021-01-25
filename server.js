@@ -86,7 +86,7 @@ app.get('/', (req, res) => {
 // fix joining collection - DONE
 // pagination - DONE
 
-// filter/search by region + address in the same query? - MONDAY
+// filter/search by region + address in the same query? - DONE
 // correct error messages, how to think when doing several queries, for example when returning empty array? should I use if statement (length === 0)? - MONDAY
 // how can I get the total results i.e clinics.length whiles doing pagination? - MONDAY
 
@@ -108,8 +108,10 @@ app.get('/clinics', async (req, res) => {
 
     console.log(`GET/clinics?search=${search}&sortField=${sortField}&sortOrder=${sortOrder}&pageSize=${pageSize}&pageNum=${pageNum}`) // How the URL will look like 
 
-    let databaseQuery = Clinic.find({ region: queryRegex }).populate('reviews') // how can I add address as well? || address?
+    let databaseQuery = Clinic.find({ $or:[ { region: queryRegex }, { address: queryRegex } ] }).populate('reviews')
   
+    // count documents for pagination 
+
     if (sortField) {
       databaseQuery = databaseQuery.sort({ 
         [sortField]: sortOrder === 'asc' ? 1 : -1
@@ -119,7 +121,7 @@ app.get('/clinics', async (req, res) => {
     res.status(200).json(results)
 
     } catch (err) {
-      res.status(404).json({ message: 'Could not find clinics', error: err.errors })
+      res.status(400).json({ message: 'Could not find clinics', error: err.errors })
     }
   })
 
