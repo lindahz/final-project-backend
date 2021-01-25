@@ -37,7 +37,7 @@ const Review = mongoose.model('Review', {
     type: Number,
     required: true,
     min: 1,
-    max: 10
+    max: 5
   },
   name: {
     type: String,
@@ -84,9 +84,11 @@ app.get('/', (req, res) => {
 
 // sort and order any parameter - DONE
 // fix joining collection - DONE
-// pagination - SUNDAY
-// filter/search by region + address - SUNDAY
-// correct error messages - SUNDAY
+// pagination - DONE
+
+// filter/search by region + address in the same query? - MONDAY
+// correct error messages, how to think when doing several queries, for example when returning empty array? should I use if statement (length === 0)? - MONDAY
+// how can I get the total results i.e clinics.length whiles doing pagination? - MONDAY
 
 // Frontend or backend?
 // filter by emergency or not
@@ -104,12 +106,9 @@ app.get('/clinics', async (req, res) => {
     const pageNum = req.query.pageNum
     const skips = pageSize * (pageNum - 1)
 
-    // how can I add address as well? + return a message instead of empty array.
-    // how can I get the total results i.e clinics.length whiles doing pagination?
-
     console.log(`GET/clinics?search=${search}&sortField=${sortField}&sortOrder=${sortOrder}&pageSize=${pageSize}&pageNum=${pageNum}`) // How the URL will look like 
 
-    let databaseQuery = Clinic.find({ region: queryRegex }).populate('reviews')
+    let databaseQuery = Clinic.find({ region: queryRegex }).populate('reviews') // how can I add address as well? || address?
   
     if (sortField) {
       databaseQuery = databaseQuery.sort({ 
@@ -150,25 +149,33 @@ app.post('/clinics/:id/review', async (req, res) => {
 
 // GET request to display all reviews
 app.get('/clinics/reviews', async (req, res) => {
-  const pageSize = req.query.pageSize
-  const pageNum = req.query.pageNum
-  const skips = pageSize * (pageNum - 1)
+  try {
+    const pageSize = req.query.pageSize
+    const pageNum = req.query.pageNum
+    const skips = pageSize * (pageNum - 1)
 
-  console.log(`GET/clinics/reviews?pageSize=${pageSize}&pageNum=${pageNum}`) // How the URL will look like 
+    console.log(`GET/clinics/reviews?pageSize=${pageSize}&pageNum=${pageNum}`) // How the URL will look like 
 
-  const reviews = await Review.find().sort({ review_date: 'desc' }).skip(skips).limit(+pageSize)
-  res.json(reviews)
+    const reviews = await Review.find().sort({ review_date: 'desc' }).skip(skips).limit(+pageSize)
+    res.json(reviews)
+  } catch (err) {
+    res.status(404).json({ message: 'Could not find reviews', error: err.errors })
+  }
 })
 
 // GET requests to display reviews by clinic ID 
 app.get('/clinic/:id/reviews', async (req, res) => {
-  const { id } = req.params
-  const pageSize = req.query.pageSize
-  const pageNum = req.query.pageNum
-  const skips = pageSize * (pageNum - 1)
+  try {
+    const { id } = req.params
+    const pageSize = req.query.pageSize
+    const pageNum = req.query.pageNum
+    const skips = pageSize * (pageNum - 1)
 
-  const reviews = await Review.find({ clinic_id: id }).skip(skips).limit(+pageSize)
-  res.json(reviews)
+    const reviews = await Review.find({ clinic_id: id }).skip(skips).limit(+pageSize)
+    res.json(reviews)
+  } catch {
+    res.status(404).json({ message: 'Could not find reviews', error: err.errors })
+  }
 })
 
 // Start the server
