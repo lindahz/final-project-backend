@@ -20,6 +20,10 @@ const Clinic = new mongoose.model('Clinic', {
     type: Number,
     default: 0
   },
+  average_rating: {
+    type: Number,
+    default: 0
+  },
   reviews: [{ 
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Review'
@@ -77,7 +81,7 @@ app.use(bodyParser.json())
 // HERE GOES THE ROUTES
 
 app.get('/', (req, res) => {
-  res.send('This is my final project API')
+  res.send('API for health clinics in Sweden. Go to https://github.com/lindahz/final-project-backend/ for documentation.')
 })
 
 // TO DO:s
@@ -85,10 +89,11 @@ app.get('/', (req, res) => {
 // sort and order any parameter - DONE
 // fix joining collection - DONE
 // pagination - DONE
-
 // filter/search by region + address in the same query? - DONE
-// correct error messages, how to think when doing several queries, for example when returning empty array? should I use if statement (length === 0)? - MONDAY
-// how can I get the total results i.e clinics.length whiles doing pagination? - MONDAY
+// how can I get the total results i.e clinics.length whiles doing pagination? - DONE
+// correct error messages for catch - NOT COMPLETED
+// add regex function for empty spaces in search query - NOT COMPLETED
+// add server error message - NOT COMPLETED 
 
 // Frontend or backend?
 // filter by emergency or not
@@ -99,16 +104,16 @@ app.get('/', (req, res) => {
 app.get('/clinics', async (req, res) => {
   try {
     const { search } = req.query
+    const queryRegex = new RegExp(search, 'i') // add regex for empty spaces
     const sortField = req.query.sortField
     const sortOrder = req.query.sortOrder || 'asc'
-    const queryRegex = new RegExp(search, 'i') // add regex for empty spaces
     const pageSize = req.query.pageSize
     const pageNum = req.query.pageNum
     const skips = pageSize * (pageNum - 1)
 
     console.log(`GET/clinics?search=${search}&sortField=${sortField}&sortOrder=${sortOrder}&pageSize=${pageSize}&pageNum=${pageNum}`) // How the URL will look like 
 
-    let databaseQuery = Clinic.find({ $or:[ { region: queryRegex }, { address: queryRegex } ] }).populate('reviews')
+    let databaseQuery = Clinic.find({ $or:[{ region: queryRegex }, { address: queryRegex }] }).populate('reviews')
 
     if (sortField) {
       databaseQuery = databaseQuery.sort({ 
@@ -118,11 +123,11 @@ app.get('/clinics', async (req, res) => {
 
     const results = await databaseQuery.skip(skips).limit(+pageSize)
     const docCount = await Clinic.countDocuments().exec()
-    
-    res.status(200).json([{ clinics: results }, { total_results: docCount }])
+
+    res.status(200).json({ clinics: results, total_results: docCount })
 
     } catch (err) {
-      res.status(400).json({ message: 'Could not find clinics', error: err.errors })
+      res.status(400).json({ success: false, error: err.errors })
     }
   })
 
@@ -143,10 +148,12 @@ app.post('/clinics/:id/review', async (req, res) => {
     const { id } = req.params
     const { review, rating, name, clinic_id } = req.body
     const savedReview = await new Review({ review, rating, name, clinic_id }).save()
-    await Clinic.updateOne({ _id: id }, { $inc : { text_reviews_count: 1 }, $push : { reviews: savedReview} })
+    await Clinic.updateOne(
+      { _id: id }, { $inc: { text_reviews_count: 1 }, $push: { reviews: savedReview}, $group: { $avg: { average_rating: rating } } }) // not sure about this part
+    // add calculation for reviews
     res.status(201).json(savedReview)
   } catch (err) {
-    res.status(404).json({ message: 'Could not create review', error: err.errors })
+    res.status(400).json({ success: false, error: err.errors })
   }
 })
 
