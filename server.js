@@ -16,6 +16,7 @@ const Clinic = new mongoose.model('Clinic', {
   clinic_name: String,
   address: String,
   open_hours: String,
+  drop_in: String,
   text_reviews_count: { 
     type: Number,
     default: 0
@@ -44,6 +45,10 @@ const Review = mongoose.model('Review', {
     max: 5
   },
   name: {
+    type: String,
+    required: true
+  },
+  title: {
     type: String,
     required: true
   },
@@ -146,10 +151,20 @@ app.get('/clinic/:id', async (req, res) => {
 app.post('/clinics/:id/review', async (req, res) => {
   try {
     const { id } = req.params
-    const { review, rating, name, clinic_id } = req.body
-    const savedReview = await new Review({ review, rating, name, clinic_id }).save()
+    const { review, rating, name, clinic_id, title } = req.body
+
+    const savedReview = await new Review({ review, rating, name, title, clinic_id }).save()
+
+    const allReviewsForClinic = await Review.find({ clinic_id })
+
+    let total = 0
+    for (let i = 0; i < allReviewsForClinic.length; i++) {
+      total += allReviewsForClinic[i].rating;
+    }
+    const calculatedAverage = total / allReviewsForClinic.length
+
     await Clinic.updateOne(
-      { _id: id }, { $inc: { text_reviews_count: 1 }, $push: { reviews: savedReview}, $group: { $avg: { average_rating: rating } } }) // not sure about this part
+      { _id: id }, { $inc: { text_reviews_count: 1 }, $push: { reviews: savedReview }, $set: { average_rating: calculatedAverage.toFixed(1) } } ) // not sure about this part
     // add calculation for reviews
     res.status(201).json(savedReview)
   } catch (err) {
