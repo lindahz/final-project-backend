@@ -120,8 +120,10 @@ app.get('/clinics', async (req, res) => {
       })
     }
 
+    const totalResults = await Clinic.find({ $or:[{ region: queryRegex }, { address: queryRegex }] }).countDocuments()
     const results = await databaseQuery.skip(skips).limit(+pageSize)
-    const totalResults = await Clinic.find({ $or:[{ region: queryRegex }, { address: queryRegex }] }).countDocuments().exec()
+
+    console.log(totalResults)
     
     res.status(200).json({ clinics: results, total_results: totalResults })
 
