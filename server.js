@@ -46,11 +46,15 @@ const Review = mongoose.model('Review', {
   },
   name: {
     type: String,
-    required: true
+    required: true,
+    minlength: 2,
+    maxlength: 26
   },
   title: {
     type: String,
-    required: true
+    required: true,
+    minlength: 5,
+    maxlength: 60
   },
   review_date: {
     type: Date,
@@ -91,19 +95,9 @@ app.get('/', (req, res) => {
 
 // TO DO:s
 
-// sort and order any parameter - DONE
-// fix joining collection - DONE
-// pagination - DONE
-// filter/search by region + address in the same query? - DONE
-// how can I get the total results i.e clinics.length whiles doing pagination? - DONE
 // correct error messages for catch - NOT COMPLETED
 // add regex function for empty spaces in search query - NOT COMPLETED
 // add server error message - NOT COMPLETED 
-
-// Frontend or backend?
-// filter by emergency or not
-// filter by clinic type
-// filter by open days
 
 // GET requests to display clinic data 
 app.get('/clinics', async (req, res) => {
@@ -127,9 +121,9 @@ app.get('/clinics', async (req, res) => {
     }
 
     const results = await databaseQuery.skip(skips).limit(+pageSize)
-    const docCount = await Clinic.countDocuments().exec()
-
-    res.status(200).json({ clinics: results, total_results: docCount })
+    const totalResults = await Clinic.find({ $or:[{ region: queryRegex }, { address: queryRegex }] }).countDocuments().exec()
+    
+    res.status(200).json({ clinics: results, total_results: totalResults })
 
     } catch (err) {
       res.status(400).json({ success: false, error: err.errors })
@@ -141,9 +135,9 @@ app.get('/clinic/:id', async (req, res) => {
   try {
     const { id } = req.params
     const clinic = await Clinic.findById(id).populate('reviews')
-    res.json(clinic)
+    res.status(200).json(clinic)
   } catch (err) {
-    res.status(404).json({ message: 'Could not find clinic with matching id', error: err.errors })
+    res.status(400).json({ message: 'Could not find clinic with matching id', error: err.errors })
   }
 })
 
@@ -152,21 +146,16 @@ app.post('/clinics/:id/review', async (req, res) => {
   try {
     const { id } = req.params
     const { review, rating, name, clinic_id, title } = req.body
-
     const savedReview = await new Review({ review, rating, name, title, clinic_id }).save()
-
     const allReviewsForClinic = await Review.find({ clinic_id })
-
     let total = 0
     for (let i = 0; i < allReviewsForClinic.length; i++) {
       total += allReviewsForClinic[i].rating;
     }
     const calculatedAverage = total / allReviewsForClinic.length
-
     await Clinic.updateOne(
-      { _id: id }, { $inc: { text_reviews_count: 1 }, $push: { reviews: savedReview }, $set: { average_rating: calculatedAverage.toFixed(1) } } ) // not sure about this part
-    // add calculation for reviews
-    res.status(201).json(savedReview)
+      { _id: id }, { $inc: { text_reviews_count: 1 }, $push: { reviews: savedReview }, $set: { average_rating: calculatedAverage.toFixed(1) } } ) 
+    res.status(201).json({ success: true })
   } catch (err) {
     res.status(400).json({ success: false, error: err.errors })
   }
@@ -182,9 +171,9 @@ app.get('/clinics/reviews', async (req, res) => {
     console.log(`GET/clinics/reviews?pageSize=${pageSize}&pageNum=${pageNum}`) // How the URL will look like 
 
     const reviews = await Review.find().sort({ review_date: 'desc' }).skip(skips).limit(+pageSize)
-    res.json(reviews)
+    res.status(200).json(reviews)
   } catch (err) {
-    res.status(404).json({ message: 'Could not find reviews', error: err.errors })
+    res.status(400).json({ message: 'Could not find reviews', error: err.errors })
   }
 })
 
@@ -197,9 +186,9 @@ app.get('/clinic/:id/reviews', async (req, res) => {
     const skips = pageSize * (pageNum - 1)
 
     const reviews = await Review.find({ clinic_id: id }).skip(skips).limit(+pageSize)
-    res.json(reviews)
+    res.status(200).json(reviews)
   } catch {
-    res.status(404).json({ message: 'Could not find reviews', error: err.errors })
+    res.status(400).json({ message: 'Could not find reviews', error: err.errors })
   }
 })
 
