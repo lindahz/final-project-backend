@@ -71,6 +71,7 @@ const Review = mongoose.model('Review', {
 if (process.env.RESET_DATABASE) {
   console.log('Resetting database!')
   const seedDatabase = async () => {
+    await Review.deleteMany({})
     await Clinic.deleteMany({}) 
     clinicData.forEach(async clinicData => {
       await new Clinic(clinicData).save()
@@ -120,7 +121,7 @@ app.get('/clinics', async (req, res) => {
       })
     }
 
-    const totalResults = await Clinic.find({ $or:[{ region: queryRegex }, { address: queryRegex }] }).countDocuments()
+    const totalResults = await Clinic.find({ $or:[{ region: queryRegex }, { address: queryRegex }] }).countDocuments()  // .exec()
     const results = await databaseQuery.skip(skips).limit(+pageSize)
 
     console.log(totalResults)
