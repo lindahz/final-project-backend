@@ -3,7 +3,7 @@ import bodyParser from 'body-parser'
 import cors from 'cors'
 import mongoose from 'mongoose'
 
-import clinicData from './data/clinic-data.json'
+// import clinicData from './data/clinic-data.json'
 
 const mongoUrl = process.env.MONGO_URL || "mongodb://localhost/healthFinder"
 mongoose.connect(mongoUrl, { useNewUrlParser: true, useUnifiedTopology: true })
@@ -66,19 +66,6 @@ const Review = mongoose.model('Review', {
     required: true
   }
 })
-
-// Use RESET_DATABASE = true in Heruko to reset
-if (process.env.RESET_DATABASE) {
-  console.log('Resetting database!')
-  const seedDatabase = async () => {
-    await Review.deleteMany({})
-    await Clinic.deleteMany({}) 
-    clinicData.forEach(async clinicData => {
-      await new Clinic(clinicData).save()
-    })
-  }
-  seedDatabase()
-}
 
 // Defines the port the app will run on
 const port = process.env.PORT || 8080
