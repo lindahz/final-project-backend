@@ -3,8 +3,6 @@ import bodyParser from 'body-parser'
 import cors from 'cors'
 import mongoose from 'mongoose'
 
-// import clinicData from './data/clinic-data.json'
-
 const mongoUrl = process.env.MONGO_URL || "mongodb://localhost/healthFinder"
 mongoose.connect(mongoUrl, { useNewUrlParser: true, useUnifiedTopology: true })
 mongoose.Promise = Promise
@@ -34,6 +32,7 @@ const Clinic = new mongoose.model('Clinic', {
 const Review = mongoose.model('Review', {
   review: {
     type: String,
+    trim: true,
     required: true,
     minlength: 5,
     maxlength: 300
@@ -46,12 +45,14 @@ const Review = mongoose.model('Review', {
   },
   name: {
     type: String,
+    trim: true,
     required: true,
     minlength: 2,
     maxlength: 26
   },
   title: {
     type: String,
+    trim: true,
     required: true,
     minlength: 5,
     maxlength: 60
@@ -67,38 +68,26 @@ const Review = mongoose.model('Review', {
   }
 })
 
-// Defines the port the app will run on
 const port = process.env.PORT || 8080
 const app = express()
 
-// Add middlewares to enable cors and json body parsing
 app.use(cors())
 app.use(bodyParser.json())
-
-// HERE GOES THE ROUTES
 
 app.get('/', (req, res) => {
   res.send('API for health clinics in Sweden. Go to https://github.com/lindahz/final-project-backend/ for documentation.')
 })
 
-// TO DO:s
-
-// correct error messages for catch - NOT COMPLETED
-// add regex function for empty spaces in search query - NOT COMPLETED
-// add server error message - NOT COMPLETED 
-
-// GET requests to display clinic data 
 app.get('/clinics', async (req, res) => {
   try {
     const { search } = req.query
-    const queryRegex = new RegExp(search, 'i') // add regex for empty spaces
+    const queryRegex = new RegExp(search, 'i') 
     const sortField = req.query.sortField
     const sortOrder = req.query.sortOrder || 'asc'
     const pageSize = req.query.pageSize
     const pageNum = req.query.pageNum
-    const skips = pageSize * (pageNum - 1)
 
-    console.log(`GET/clinics?search=${search}&sortField=${sortField}&sortOrder=${sortOrder}&pageSize=${pageSize}&pageNum=${pageNum}`) // How the URL will look like 
+    const skips = pageSize * (pageNum - 1)
 
     let databaseQuery = Clinic.find({ $or:[{ region: queryRegex }, { address: queryRegex }] }).populate('reviews')
 
@@ -108,19 +97,16 @@ app.get('/clinics', async (req, res) => {
       })
     }
 
-    const totalResults = await Clinic.find({ $or:[{ region: queryRegex }, { address: queryRegex }] }).countDocuments()  // .exec()
+    const totalResults = await Clinic.find({ $or:[{ region: queryRegex }, { address: queryRegex }] }).countDocuments() 
+
     const results = await databaseQuery.skip(skips).limit(+pageSize)
 
-    console.log(totalResults)
-    
     res.status(200).json({ clinics: results, total_results: totalResults })
-
     } catch (err) {
       res.status(400).json({ success: false, error: err.errors })
     }
   })
 
-// GET request to display a clinic by ID
 app.get('/clinic/:id', async (req, res) => {
   try {
     const { id } = req.params
@@ -131,7 +117,6 @@ app.get('/clinic/:id', async (req, res) => {
   }
 })
 
-// POST request reviews for a certain clinic
 app.post('/clinics/:id/review', async (req, res) => {
   try {
     const { id } = req.params
@@ -144,22 +129,23 @@ app.post('/clinics/:id/review', async (req, res) => {
     }
     const calculatedAverage = total / allReviewsForClinic.length
     await Clinic.updateOne(
-      { _id: id }, { $inc: { text_reviews_count: 1 }, $push: { reviews: savedReview }, $set: { average_rating: calculatedAverage.toFixed(1) } } ) 
+      { _id: id }, { 
+        $inc: { text_reviews_count: 1 },
+        $push: { reviews: savedReview },
+        $set: { average_rating: calculatedAverage.toFixed(1) } 
+      }
+    ) 
     res.status(201).json({ success: true })
   } catch (err) {
     res.status(400).json({ success: false, error: err.errors })
   }
 })
 
-// GET request to display all reviews
 app.get('/clinics/reviews', async (req, res) => {
   try {
     const pageSize = req.query.pageSize
     const pageNum = req.query.pageNum
     const skips = pageSize * (pageNum - 1)
-
-    console.log(`GET/clinics/reviews?pageSize=${pageSize}&pageNum=${pageNum}`) // How the URL will look like 
-
     const reviews = await Review.find().sort({ review_date: 'desc' }).skip(skips).limit(+pageSize)
     res.status(200).json(reviews)
   } catch (err) {
@@ -167,14 +153,12 @@ app.get('/clinics/reviews', async (req, res) => {
   }
 })
 
-// GET requests to display reviews by clinic ID 
 app.get('/clinic/:id/reviews', async (req, res) => {
   try {
     const { id } = req.params
     const pageSize = req.query.pageSize
     const pageNum = req.query.pageNum
     const skips = pageSize * (pageNum - 1)
-
     const reviews = await Review.find({ clinic_id: id }).skip(skips).limit(+pageSize)
     res.status(200).json(reviews)
   } catch {
@@ -182,7 +166,6 @@ app.get('/clinic/:id/reviews', async (req, res) => {
   }
 })
 
-// Start the server
 app.listen(port, () => {
   console.log(`Server running on http://localhost:${port}`)
 })
