@@ -74,6 +74,15 @@ const app = express()
 app.use(cors())
 app.use(bodyParser.json())
 
+
+app.use((req, res, next) => {
+  if (mongoose.connection.readyState === 1) {
+    next()
+  } else {
+    res.status(503).json({ error: 'Service unavailable' })
+  }
+})
+
 app.get('/', (req, res) => {
   res.send('API for health clinics in Sweden. Go to https://github.com/lindahz/final-project-backend/ for documentation.')
 })
@@ -98,7 +107,6 @@ app.get('/clinics', async (req, res) => {
     }
 
     const totalResults = await Clinic.find({ $or:[{ region: queryRegex }, { address: queryRegex }] }).countDocuments() 
-
     const results = await databaseQuery.skip(skips).limit(+pageSize)
 
     res.status(200).json({ clinics: results, total_results: totalResults })
@@ -107,13 +115,15 @@ app.get('/clinics', async (req, res) => {
     }
   })
 
-app.get('/clinic/:id', async (req, res) => {
+app.get('/clinics/:id', async (req, res) => {
   try {
     const { id } = req.params
+
     const clinic = await Clinic.findById(id).populate('reviews')
+
     res.status(200).json(clinic)
   } catch (err) {
-    res.status(400).json({ message: 'Could not find clinic with matching id', error: err.errors })
+    res.status(404).json({ success: false, error: err.errors })
   }
 })
 
@@ -121,13 +131,17 @@ app.post('/clinics/:id/review', async (req, res) => {
   try {
     const { id } = req.params
     const { review, rating, name, clinic_id, title } = req.body
+
     const savedReview = await new Review({ review, rating, name, title, clinic_id }).save()
     const allReviewsForClinic = await Review.find({ clinic_id })
+
     let total = 0
     for (let i = 0; i < allReviewsForClinic.length; i++) {
       total += allReviewsForClinic[i].rating;
     }
+
     const calculatedAverage = total / allReviewsForClinic.length
+
     await Clinic.updateOne(
       { _id: id }, { 
         $inc: { text_reviews_count: 1 },
@@ -135,6 +149,7 @@ app.post('/clinics/:id/review', async (req, res) => {
         $set: { average_rating: calculatedAverage.toFixed(1) } 
       }
     ) 
+
     res.status(201).json({ success: true })
   } catch (err) {
     res.status(400).json({ success: false, error: err.errors })
@@ -145,24 +160,30 @@ app.get('/clinics/reviews', async (req, res) => {
   try {
     const pageSize = req.query.pageSize
     const pageNum = req.query.pageNum
+
     const skips = pageSize * (pageNum - 1)
+
     const reviews = await Review.find().sort({ review_date: 'desc' }).skip(skips).limit(+pageSize)
+
     res.status(200).json(reviews)
   } catch (err) {
-    res.status(400).json({ message: 'Could not find reviews', error: err.errors })
+    res.status(400).json({ success: false, error: err.errors })
   }
 })
 
-app.get('/clinic/:id/reviews', async (req, res) => {
+app.get('/clinics/:id/reviews', async (req, res) => {
   try {
     const { id } = req.params
     const pageSize = req.query.pageSize
     const pageNum = req.query.pageNum
+
     const skips = pageSize * (pageNum - 1)
+
     const reviews = await Review.find({ clinic_id: id }).skip(skips).limit(+pageSize)
+
     res.status(200).json(reviews)
   } catch {
-    res.status(400).json({ message: 'Could not find reviews', error: err.errors })
+    res.status(404).json({ success: false, error: err.errors })
   }
 })
 
