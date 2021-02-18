@@ -123,10 +123,8 @@ app.get('/test', async (req, res) => {
     const sortField = req.query.sortField
     const sortOrder = req.query.sortOrder || 'asc'
     
-    const hospital = req.query.hospital
-    const healthClinic = req.query.healthClinic
-    const allHours = req.query.allHours
-    const regHours = req.query.regHours
+    const clinicType = req.query.clinicType
+    const openHours = req.query.openHours
     const dropin = req.query.dropin
 
     const pageSize = req.query.pageSize
@@ -141,31 +139,27 @@ app.get('/test', async (req, res) => {
       })
     }
 
-    if (hospital == 'true') {
+    if (clinicType === 'emg') {
       databaseQuery = databaseQuery.
         where('clinic_operation').
         in(['Akutverksamhet', 'Akutverksamhet med basåtagande i primärvård', 'Akutverksamhet utan basåtagande i primärvård'])
-    }
+    } else if (clinicType == 'reg') {
+        databaseQuery = databaseQuery.
+          where('clinic_operation').
+          equals(['Vårdcentral'])
+      }
 
-    if (healthClinic == 'true') {
-      databaseQuery = databaseQuery.
-        where('clinic_operation').
-        equals(['Vårdcentral'])
-    }
-
-    if (allHours == 'true') {
+    if (openHours === 'all') {
       databaseQuery = databaseQuery.
         where('open_hours').
         equals('Dygnet runt')
-    }
+    } else if (openHours === 'other') {
+        databaseQuery = databaseQuery.
+          where('open_hours').
+          ne('Ej angivet/stängt')
+      }
 
-    if (regHours == 'true') {
-      databaseQuery = databaseQuery.
-        where('open_hours').
-        ne('Ej angivet/stängt')
-    }
-
-    if (dropin == 'true') {
+    if (dropin === 'dropin') {
       databaseQuery.
         where('drop_in').
         ne('Ej angivet/stängt')
