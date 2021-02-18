@@ -115,6 +115,72 @@ app.get('/clinics', async (req, res) => {
     }
   })
 
+app.get('/test', async (req, res) => {
+  try {
+    const { search } = req.query
+    const queryRegex = new RegExp(search, 'i')
+
+    const sortField = req.query.sortField
+    const sortOrder = req.query.sortOrder || 'asc'
+    
+    const hospital = req.query.hospital
+    const healthClinic = req.query.healthClinic
+    const allHours = req.query.allHours
+    const regHours = req.query.regHours
+    const dropin = req.query.dropin
+
+    const pageSize = req.query.pageSize
+    const pageNum = req.query.pageNum
+    const skips = pageSize * (pageNum - 1)
+
+    let databaseQuery = Clinic.find({ $or:[{ region: queryRegex }, { address: queryRegex }] })
+
+    if (sortField) {
+      databaseQuery = databaseQuery.sort({ 
+        [sortField]: sortOrder === 'asc' ? 1 : -1
+      })
+    }
+
+    if (hospital == 'true') {
+      databaseQuery = databaseQuery.
+        where('clinic_operation').
+        in(['Akutverksamhet', 'Akutverksamhet med basåtagande i primärvård', 'Akutverksamhet utan basåtagande i primärvård'])
+    }
+
+    if (healthClinic == 'true') {
+      databaseQuery = databaseQuery.
+        where('clinic_operation').
+        equals(['Vårdcentral'])
+    }
+
+    if (allHours == 'true') {
+      databaseQuery = databaseQuery.
+        where('open_hours').
+        equals('Dygnet runt')
+    }
+
+    if (regHours == 'true') {
+      databaseQuery = databaseQuery.
+        where('open_hours').
+        ne('Ej angivet/stängt')
+    }
+
+    if (dropin == 'true') {
+      databaseQuery.
+        where('drop_in').
+        ne('Ej angivet/stängt')
+    }
+
+    const totalResults = await Clinic.find({ $or:[{ region: queryRegex }, { address: queryRegex }] }).countDocuments()
+    const clinics = await databaseQuery.skip(skips).limit(+pageSize).populate('reviews').exec()
+  
+    res.status(200).json({ total_results: totalResults, clinics: clinics })
+
+  } catch (err) {
+    res.status(404).json({ success: false, error: err.errors })
+  }
+})
+
 app.get('/clinics/:id', async (req, res) => {
   try {
     const { id } = req.params
