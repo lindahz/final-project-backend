@@ -126,6 +126,7 @@ app.get('/test', async (req, res) => {
     const clinicType = req.query.clinicType
     const openHours = req.query.openHours
     const dropin = req.query.dropin
+    const avgRating = req.query.avgRating
 
     const pageSize = req.query.pageSize
     const pageNum = req.query.pageNum
@@ -144,9 +145,9 @@ app.get('/test', async (req, res) => {
         where('clinic_operation').
         in(['Akutverksamhet', 'Akutverksamhet med basåtagande i primärvård', 'Akutverksamhet utan basåtagande i primärvård'])
     } else if (clinicType == 'reg') {
-        databaseQuery = databaseQuery.
-          where('clinic_operation').
-          equals(['Vårdcentral'])
+      databaseQuery = databaseQuery.
+        where('clinic_operation').
+        equals(['Vårdcentral'])
       }
 
     if (openHours === 'all') {
@@ -154,15 +155,38 @@ app.get('/test', async (req, res) => {
         where('open_hours').
         equals('Dygnet runt')
     } else if (openHours === 'other') {
-        databaseQuery = databaseQuery.
-          where('open_hours').
-          ne('Ej angivet/stängt')
+      databaseQuery = databaseQuery.
+        where('open_hours').
+        ne('Ej angivet/stängt')
       }
 
     if (dropin === 'dropin') {
       databaseQuery.
         where('drop_in').
         ne('Ej angivet/stängt')
+    }
+
+    // Queries avg rating depending on the least amount of stars
+    if (avgRating === '1') {
+      databaseQuery.
+        where('average_rating').
+        gte(1)
+    } else if (avgRating === '2') {
+      databaseQuery.
+        where('average_rating').
+        gte(2)
+    } else if (avgRating === '3') {
+      databaseQuery.
+        where('average_rating').
+        gte(3)
+    } else if (avgRating === '4') {
+      databaseQuery.
+        where('average_rating').
+        gte(4)
+    } else if (avgRating === '5') {
+      databaseQuery.
+        where('average_rating').
+        gte(5)
     }
 
     const totalResults = await Clinic.find({ $or:[{ region: queryRegex }, { address: queryRegex }] }).countDocuments()
