@@ -1,4 +1,4 @@
-import express from 'express'
+import express, { query } from 'express'
 import bodyParser from 'body-parser'
 import cors from 'cors'
 import mongoose from 'mongoose'
@@ -90,72 +90,42 @@ app.get('/', (req, res) => {
 app.get('/clinics', async (req, res) => {
   try {
     const { search } = req.query
-    const queryRegex = new RegExp(search, 'i') 
-    const sortField = req.query.sortField
-    const sortOrder = req.query.sortOrder || 'asc'
-    const pageSize = req.query.pageSize
-    const pageNum = req.query.pageNum
-
-    const skips = pageSize * (pageNum - 1)
-
-    let databaseQuery = Clinic.find({ $or:[{ region: queryRegex }, { address: queryRegex }] }).populate('reviews')
-
-    if (sortField) {
-      databaseQuery = databaseQuery.sort({ 
-        [sortField]: sortOrder === 'asc' ? 1 : -1
-      })
-    }
-
-    const totalResults = await Clinic.find({ $or:[{ region: queryRegex }, { address: queryRegex }] }).countDocuments() 
-    const results = await databaseQuery.skip(skips).limit(+pageSize)
-
-    res.status(200).json({ clinics: results, total_results: totalResults })
-    } catch (err) {
-      res.status(400).json({ success: false, error: err.errors })
-    }
-  })
-
-app.get('/test', async (req, res) => {
-  try {
-    const { search } = req.query
     const queryRegex = new RegExp(search, 'i')
-
     const sortField = req.query.sortField
     const sortOrder = req.query.sortOrder || 'asc'
-    
     const clinicType = req.query.clinicType
     const openHours = req.query.openHours
     const dropin = req.query.dropin
     const avgRating = req.query.avgRating
-
     const pageSize = req.query.pageSize
     const pageNum = req.query.pageNum
+  
     const skips = pageSize * (pageNum - 1)
 
-    let databaseQuery = Clinic.find({ $or:[{ region: queryRegex }, { address: queryRegex }] })
+    const databaseQuery = Clinic.find({ $or:[{ region: queryRegex }, { address: queryRegex }] })
 
     if (sortField) {
-      databaseQuery = databaseQuery.sort({ 
+      databaseQuery.sort({ 
         [sortField]: sortOrder === 'asc' ? 1 : -1
       })
     }
 
     if (clinicType === 'emg') {
-      databaseQuery = databaseQuery.
+      databaseQuery.
         where('clinic_operation').
         in(['Akutverksamhet', 'Akutverksamhet med basåtagande i primärvård', 'Akutverksamhet utan basåtagande i primärvård'])
     } else if (clinicType == 'reg') {
-      databaseQuery = databaseQuery.
+      databaseQuery.
         where('clinic_operation').
         equals(['Vårdcentral'])
       }
 
     if (openHours === 'all') {
-      databaseQuery = databaseQuery.
+      databaseQuery.
         where('open_hours').
         equals('Dygnet runt')
     } else if (openHours === 'other') {
-      databaseQuery = databaseQuery.
+      databaseQuery.
         where('open_hours').
         ne('Ej angivet/stängt')
       }
@@ -189,11 +159,13 @@ app.get('/test', async (req, res) => {
         gte(5)
     }
 
+    // Counts documents before filters, skip and limit
     const totalResults = await Clinic.find({ $or:[{ region: queryRegex }, { address: queryRegex }] }).countDocuments()
-    const clinics = await databaseQuery.skip(skips).limit(+pageSize).populate('reviews').exec()
+    // ----> I failed to create the following query that should count documents after filtering, that I need for pagination.
+    // const filteredResults = await databaseQuery.countDocuments()
+    const query = await databaseQuery.skip(skips).limit(+pageSize).populate('reviews').exec()
   
-    res.status(200).json({ total_results: totalResults, clinics: clinics })
-
+    res.status(200).json({ total_results: totalResults, clinics: query })
   } catch (err) {
     res.status(404).json({ success: false, error: err.errors })
   }
@@ -219,6 +191,7 @@ app.post('/clinics/:id/review', async (req, res) => {
     const savedReview = await new Review({ review, rating, name, title, clinic_id }).save()
     const allReviewsForClinic = await Review.find({ clinic_id })
 
+    // Adds the total value of ratings per clinic to calculate the average
     let total = 0
     for (let i = 0; i < allReviewsForClinic.length; i++) {
       total += allReviewsForClinic[i].rating;
